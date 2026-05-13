@@ -1,78 +1,66 @@
-
 import streamlit as st
 from PIL import Image, ImageOps, ImageFilter
 from fpdf import FPDF
 import tempfile
 import os
 
-st.set_page_config(page_title="Document Scanner", layout="centered")
+st.set_page_config(page_title="Adobe Scan Clone", layout="centered")
 
-st.title("📄 Document Scanner")
-st.write("Upload a document image, convert it to black & white, and download it as a PDF.")
+st.title("📄 Adobe Scan Style App")
 
 uploaded_file = st.file_uploader(
-    "Upload an image",
-    type=["jpg", "jpeg", "png"]
+    "Upload Document Image",
+    type=["png", "jpg", "jpeg"]
 )
 
-def process_image(image):
+def make_scan(image):
     # Convert to grayscale
     gray = ImageOps.grayscale(image)
 
-    # Increase contrast for scan-like effect
-    bw = gray.point(lambda x: 0 if x < 140 else 255, '1')
+    # Improve scan appearance
+    bw = gray.point(lambda x: 0 if x < 150 else 255, '1')
 
-    # Slight sharpening
+    # Sharpen
     bw = bw.filter(ImageFilter.SHARPEN)
 
     return bw.convert("RGB")
 
-def image_to_pdf(image):
-    # Save temporary image
-    temp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-    image.save(temp_img.name, "JPEG")
+def create_pdf(image):
+    temp_image = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+    image.save(temp_image.name)
 
-    # Create PDF
     pdf = FPDF()
     pdf.add_page()
 
-    # A4 size
-    page_width = 190
-    img_width, img_height = image.size
-
-    ratio = img_height / img_width
-    pdf_height = page_width * ratio
-
-    pdf.image(temp_img.name, x=10, y=10, w=page_width, h=pdf_height)
+    pdf.image(temp_image.name, x=10, y=10, w=190)
 
     temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf.output(temp_pdf.name)
 
     return temp_pdf.name
 
-if uploaded_file:
+if uploaded_file is not None:
+
     image = Image.open(uploaded_file)
 
     st.subheader("Original Image")
     st.image(image, use_container_width=True)
 
-    if st.button("Convert to Scan PDF"):
-        with st.spinner("Processing..."):
+    if st.button("Convert to PDF"):
 
-            processed_image = process_image(image)
+        scanned = make_scan(image)
 
-            st.subheader("Scanned Preview")
-            st.image(processed_image, use_container_width=True)
+        st.subheader("Scanned Version")
+        st.image(scanned, use_container_width=True)
 
-            pdf_path = image_to_pdf(processed_image)
+        pdf_file = create_pdf(scanned)
 
-            with open(pdf_path, "rb") as pdf_file:
-                st.download_button(
-                    label="📥 Download PDF",
-                    data=pdf_file,
-                    file_name="scanned_document.pdf",
-                    mime="application/pdf"
-                )
+        with open(pdf_file, "rb") as f:
+            st.download_button(
+                "⬇ Download PDF",
+                data=f,
+                file_name="scanned_document.pdf",
+                mime="application/pdf"
+            )
 
-            # Cleanup temp files
-            os.unlink(pdf_path)
+        os.remove(pdf_file)
