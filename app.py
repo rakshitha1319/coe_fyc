@@ -1,66 +1,23 @@
 import streamlit as st
-from PIL import Image, ImageOps, ImageFilter
-from fpdf import FPDF
-import tempfile
-import os
+from PIL import Image
+import cv2
+import numpy as np
 
-st.set_page_config(page_title="Adobe Scan Clone", layout="centered")
+st.title("AI Document Scanner")
 
-st.title("📄 Adobe Scan Style App")
+file = st.file_uploader("Upload Image")
 
-uploaded_file = st.file_uploader(
-    "Upload Document Image",
-    type=["png", "jpg", "jpeg"]
-)
+if file:
+    image = Image.open(file)
+    img = np.array(image)
 
-def make_scan(image):
-    # Convert to grayscale
-    gray = ImageOps.grayscale(image)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # Improve scan appearance
-    bw = gray.point(lambda x: 0 if x < 150 else 255, '1')
+    scan = cv2.adaptiveThreshold(
+        gray,255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        11,2
+    )
 
-    # Sharpen
-    bw = bw.filter(ImageFilter.SHARPEN)
-
-    return bw.convert("RGB")
-
-def create_pdf(image):
-    temp_image = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-    image.save(temp_image.name)
-
-    pdf = FPDF()
-    pdf.add_page()
-
-    pdf.image(temp_image.name, x=10, y=10, w=190)
-
-    temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    pdf.output(temp_pdf.name)
-
-    return temp_pdf.name
-
-if uploaded_file is not None:
-
-    image = Image.open(uploaded_file)
-
-    st.subheader("Original Image")
-    st.image(image, use_container_width=True)
-
-    if st.button("Convert to PDF"):
-
-        scanned = make_scan(image)
-
-        st.subheader("Scanned Version")
-        st.image(scanned, use_container_width=True)
-
-        pdf_file = create_pdf(scanned)
-
-        with open(pdf_file, "rb") as f:
-            st.download_button(
-                "⬇ Download PDF",
-                data=f,
-                file_name="scanned_document.pdf",
-                mime="application/pdf"
-            )
-
-        os.remove(pdf_file)
+    st.image(scan, caption="Scanned Image")
